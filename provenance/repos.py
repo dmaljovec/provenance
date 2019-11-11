@@ -318,7 +318,16 @@ class ArtifactProxy(wrapt.ObjectProxy, Proxy):
             format(self.artifact.id, repr(self.__wrapped__))
 
     def __reduce__(self):
-        return (load_proxy , (self.artifact.id,))
+        return (load_proxy, (self.artifact.id,))
+
+    def __reduce_ex__(self, protocol_version):
+        return self.__reduce__()
+
+    def __copy__(self):
+        return ArtifactProxy(copy.copy(self.__wrapped__), self._self_artifact)
+
+    def __deepcopy__(self, memo=None):
+        return ArtifactProxy(copy.deepcopy(self.__wrapped__, memo), self._self_artifact)
 
 
 class CallableArtifactProxy(wrapt.CallableObjectProxy, Proxy):
@@ -337,6 +346,14 @@ class CallableArtifactProxy(wrapt.CallableObjectProxy, Proxy):
     def __reduce__(self):
         return (load_proxy, (self.artifact.id,))
 
+    def __reduce_ex__(self, protocol_version):
+        return self.__reduce__()
+
+    def __copy__(self):
+        return CallableArtifactProxy(copy.copy(self.__wrapped__), self._self_artifact)
+
+    def __deepcopy__(self, memo=None):
+        return CallableArtifactProxy(copy.deepcopy(self.__wrapped__, memo), self._self_artifact)
 
 def artifact_proxy(value, artifact):
     if callable(value):
@@ -357,7 +374,7 @@ class Artifact(object):
         self.__dict__ = props.copy()
         self.repo = repo
 
-        if value != 'not provided':
+        if not isinstance(value, str) or value != 'not provided':
             self._value = value
         if inputs is not None:
             self._inputs = inputs
@@ -696,7 +713,7 @@ class PostgresRepo(ArtifactRepository):
 
         if create_schema and schema is not None:
             with self.session() as session:
-                q = sa.exists(sa.select([("schema_name")]).select_from(sa.text("information_schema.schemata"))
+                q = sa.exists(sa.select([sa.text("schema_name")]).select_from(sa.text("information_schema.schemata"))
                               .where(sa.text("schema_name = :schema")
                                      .bindparams(schema=schema)))
                 if not session.query(q).scalar():
