@@ -63,23 +63,24 @@ def random_data(N=64, D_in=1000, H=100, D_out=10):
     }
 
 
-# @p.provenance(returns_composite=True)
+@p.provenance(returns_composite=True)
 def fit_model(model,
               x,
               y,
               batch_size=32,
               epochs=500,):
 
+    model_ = deepcopy(model)
     # Construct our loss function and an Optimizer. The call to
     # model.parameters() in the SGD constructor will contain the learnable
     # parameters of the two nn.Linear modules which are members of the model.
     criterion = torch.nn.MSELoss(reduction='sum')
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.SGD(model_.parameters(), lr=1e-4)
 
     losses = []
     for t in range(epochs):
         # Forward pass: Compute predicted y by passing x to the model
-        y_pred = model(x)
+        y_pred = model_(x)
 
         # Compute and print loss
         loss = criterion(y_pred, y)
@@ -90,10 +91,10 @@ def fit_model(model,
         loss.backward()
         optimizer.step()
 
-    return {'model': model, 'losses': losses}
+    return {'model': model_, 'losses': losses}
 
 
-# @p.provenance()
+@p.provenance()
 def basic_model(D_in=1000, H=100, D_out=10):
     return TwoLayerNet(D_in=D_in, H=H, D_out=D_out)
 
@@ -103,14 +104,13 @@ def test_integration_pytorch_test(dbdiskrepo):
     data = random_data()
     model = basic_model()
     model2 = copy(model)
-    # assert model2.artifact.id == model.artifact.id
+    assert model2.artifact.id == model.artifact.id
     assert hash(model2) == hash(model)
 
     fitted_model = fit_model(model, data['X_train'], data['Y_train'])
 
-    # assert model.artifact.id != fitted_model.artifact.id
-    # assert fitted_model.artifact.value_id == p.hash(
-    #     fitted_model.artifact.value)
+    assert model.artifact.id != fitted_model.artifact.id
+    assert fitted_model.artifact.value_id == p.hash(fitted_model.artifact.value)
 
     # model2 = basic_model()
     # assert model2.artifact.id == model.artifact.id
