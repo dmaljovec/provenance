@@ -71,13 +71,12 @@ def test_permissions():
     with pytest.raises(cs.PermissionError) as e:
         store.delete('a')
 
-def test_s3store(s3fs):
+@given(sha1, builtin_data)
+def test_s3store(s3fs, key, obj):
     tmp_dir = '/tmp/prov_s3store'
     shutil.rmtree(tmp_dir, ignore_errors=True)
     basepath = "bucket/prov_test"
     store = bs.S3Store(tmp_dir, basepath, s3fs=s3fs, delete=True)
-    key = sha1.example()
-    obj = builtin_data.example()
 
     assert_store_basic_ops(store, key, obj)
 
