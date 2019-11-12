@@ -117,12 +117,10 @@ if _pytorch_present():
     import torch
 
     def pytorch_model_dump(model, filename, **kwargs):
-        return torch.save(model.state_dict(), filename, **kwargs)
+        return torch.save(model, filename)
 
     def pytorch_model_load(filename, **kwargs):
-        model = kwargs['model_class'](**kwargs)
-        model.load_state_dict(torch.load(filename))
-        return model
+        return torch.load(filename)
 
     register_serializer('pytorch_model', pytorch_model_dump, pytorch_model_load,
                         classes=[torch.nn.Module])
