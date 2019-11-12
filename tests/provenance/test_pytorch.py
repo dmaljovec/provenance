@@ -23,10 +23,16 @@ pytest.importorskip("torch")
 
 
 class TwoLayerNet(torch.nn.Module):
+    """
+    This class is copied from PyTorch's documentation and is meant to be the
+    simplest, non-trivial custom NN we can use for testing provenance.
+    See [here](https://pytorch.org/tutorials/beginner/examples_nn/two_layer_net_module.html#sphx-glr-beginner-examples-nn-two-layer-net-module-py)
+    """
+
     def __init__(self, D_in, H, D_out):
         """
-        In the constructor we instantiate two nn.Linear modules and assign them as
-        member variables.
+        In the constructor we instantiate two nn.Linear modules and assign them
+        as member variables.
         """
         super(TwoLayerNet, self).__init__()
         self.linear1 = torch.nn.Linear(D_in, H)
@@ -34,9 +40,9 @@ class TwoLayerNet(torch.nn.Module):
 
     def forward(self, x):
         """
-        In the forward function we accept a Tensor of input data and we must return
-        a Tensor of output data. We can use Modules defined in the constructor as
-        well as arbitrary operators on Tensors.
+        In the forward function we accept a Tensor of input data and we must
+        return a Tensor of output data. We can use Modules defined in the
+        constructor as well as arbitrary operators on Tensors.
         """
         h_relu = self.linear1(x).clamp(min=0)
         y_pred = self.linear2(h_relu)
@@ -45,9 +51,11 @@ class TwoLayerNet(torch.nn.Module):
 
 def random_data(N, D_in, D_out):
     """
-    N is batch size
-    D_in is input dimension
-    D_out is output dimension
+    Generates random data for training/testing the PyTorch model.
+
+    N is the data size
+    D_in is the input dimension
+    D_out is the output dimension
     """
 
     # Create random Tensors to hold inputs and outputs
@@ -63,7 +71,12 @@ def random_data(N, D_in, D_out):
 
 @p.provenance(returns_composite=True)
 def fit_model(N=64, D_in=1000, D_out=10, H=100, epochs=500, seed=None):
-
+    """
+    An example workflow that provenance can handle from PyTorch. The model
+    parameters, the data parameters, and the fit parameters are all passed
+    into this function, and the output includes the PyTorch model and some
+    metadata regarding its fit history (a list of losses after each epoch).
+    """
     if seed is not None:
         torch.manual_seed(seed)
 
@@ -97,6 +110,10 @@ def fit_model(N=64, D_in=1000, D_out=10, H=100, epochs=500, seed=None):
 
 
 def test_same_models_are_equal(dbdiskrepo):
+    """
+    Validates that two separately constructed models using the same parameters
+    hash to the same artifact in provenance terms.
+    """
     fit1 = fit_model()
     fit2 = fit_model()
     assert fit1.artifact.id == fit2.artifact.id
@@ -105,6 +122,10 @@ def test_same_models_are_equal(dbdiskrepo):
 
 
 def test_copied_models_are_equal(dbdiskrepo):
+    """
+    Validates that a copied model (deep or shallow copied) hashes to the same
+    artifact as the original in provenance terms.
+    """
     original = fit_model()
 
     shallow = copy(original)
@@ -119,6 +140,10 @@ def test_copied_models_are_equal(dbdiskrepo):
 
 
 def test_reloading_from_disk_has_same_value_id(dbdiskrepo):
+    """
+    Validates that we can write and read a pytorch model as an artifact and that
+    it is the same going in as coming out.
+    """
     original = fit_model()
     loaded = p.load_proxy(original.artifact.id)
 
@@ -128,6 +153,10 @@ def test_reloading_from_disk_has_same_value_id(dbdiskrepo):
 
 
 def test_different_seeds_result_in_different_models(dbdiskrepo):
+    """
+    Validates that using different pytorch seeds to the fit model results in
+    the same artifact.
+    """
     fit1 = fit_model(seed=0)
     fit2 = fit_model(seed=1)
 
@@ -137,6 +166,10 @@ def test_different_seeds_result_in_different_models(dbdiskrepo):
 
 
 def test_same_seeds_result_in_same_models(dbdiskrepo):
+    """
+    Validates that using the same pytorch seed to the fit model results in
+    different artifacts.
+    """
     fit1 = fit_model(seed=0)
     fit2 = fit_model(seed=0)
 
