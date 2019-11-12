@@ -78,7 +78,6 @@ def _pandas_and_parquet_present():
 if _pandas_and_parquet_present():
     import pandas as pd
 
-
     def pd_df_parquet_dump(df, filename, **kwargs):
         return df.to_parquet(filename, **kwargs)
 
@@ -87,6 +86,7 @@ if _pandas_and_parquet_present():
 
     register_serializer('pd_df_parquet', pd_df_parquet_dump, pd_df_parquet_load,
                         classes=[pd.DataFrame])
+
 
     def pd_series_parquet_dump(series, filename, **kwargs):
         if series.name is None:
