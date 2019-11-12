@@ -1,4 +1,3 @@
-import torch
 from provenance.hashing import hash
 from conftest import artifact_record
 import provenance.utils as u
@@ -20,7 +19,7 @@ from copy import copy, deepcopy
 
 import pytest
 pytest.importorskip("torch")
-
+import torch
 
 class TwoLayerNet(torch.nn.Module):
     """
