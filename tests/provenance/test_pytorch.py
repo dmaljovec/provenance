@@ -43,11 +43,10 @@ class TwoLayerNet(torch.nn.Module):
         return y_pred
 
 
-def random_data(N=64, D_in=1000, H=100, D_out=10):
+def random_data(N, D_in, D_out):
     """
     N is batch size
     D_in is input dimension
-    H is hidden dimension
     D_out is output dimension
     """
 
@@ -63,19 +62,27 @@ def random_data(N=64, D_in=1000, H=100, D_out=10):
 
 
 @p.provenance(returns_composite=True)
-def fit_model(model, x, y, batch_size=32, epochs=500):
+def fit_model(N=64, D_in=1000, D_out=10, H=100, epochs=500, seed=None):
 
-    model_ = deepcopy(model)
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    data = random_data(N, D_in, D_out)
+    x = data['X_train']
+    y = data['Y_train']
+
+    model = TwoLayerNet(D_in, H, D_out)
+
     # Construct our loss function and an Optimizer. The call to
     # model.parameters() in the SGD constructor will contain the learnable
     # parameters of the two nn.Linear modules which are members of the model.
     criterion = torch.nn.MSELoss(reduction='sum')
-    optimizer = torch.optim.SGD(model_.parameters(), lr=1e-4)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
 
     losses = []
     for t in range(epochs):
         # Forward pass: Compute predicted y by passing x to the model
-        y_pred = model_(x)
+        y_pred = model(x)
 
         # Compute and print loss
         loss = criterion(y_pred, y)
@@ -86,80 +93,53 @@ def fit_model(model, x, y, batch_size=32, epochs=500):
         loss.backward()
         optimizer.step()
 
-    return {'model': model_, 'losses': losses}
+    return {'model': model, 'losses': losses}
 
 
-@p.provenance()
-def basic_model(D_in=1000, H=100, D_out=10):
-    return TwoLayerNet(D_in=D_in, H=H, D_out=D_out)
-
-
-def test_same_models(dbdiskrepo):
-    model1 = basic_model()
-    model2 = basic_model()
-    assert model1.artifact.id == model2.artifact.id
-
-    model3 = copy(model1)
-    assert model1.artifact.id == model3.artifact.id
-    assert hash(model1) == hash(model3)
-
-    model4 = deepcopy(model1)
-    assert model1.artifact.id == model4.artifact.id
-    assert hash(model1) == hash(model4)
-
-
-def test_integration_pytorch_test(dbdiskrepo):
-    model1 = basic_model()
-    model2 = copy(model1)
-    assert model1.artifact.id == model2.artifact.id
-    assert hash(model1) == hash(model2)
-
-    data = random_data()
-    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
-    assert model1.artifact.id != fit1.artifact.id
-    assert model1.artifact.value_id != fit1.artifact.value_id
-
-    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
+def test_same_models_are_equal(dbdiskrepo):
+    fit1 = fit_model()
+    fit2 = fit_model()
+    assert fit1.artifact.id == fit2.artifact.id
     assert fit1.artifact.value_id == fit2.artifact.value_id
+    assert hash(fit1) == hash(fit2)
+
+
+def test_copied_models_are_equal(dbdiskrepo):
+    original = fit_model()
+
+    shallow = copy(original)
+    assert original.artifact.id == shallow.artifact.id
+    assert original.artifact.value_id == shallow.artifact.value_id
+    assert hash(original) == hash(shallow)
+
+    deep = deepcopy(original)
+    assert original.artifact.id == deep.artifact.id
+    assert original.artifact.value_id == deep.artifact.value_id
+    assert hash(original) == hash(deep)
 
 
 def test_reloading_from_disk_has_same_value_id(dbdiskrepo):
-    data = random_data()
-    model = basic_model()
-    fit = fit_model(model, data['X_train'], data['Y_train'])
-    loaded = p.load_proxy(fit.artifact.id)
+    original = fit_model()
+    loaded = p.load_proxy(original.artifact.id)
 
     assert loaded.artifact.value_id == p.hash(loaded.artifact.value)
-    assert loaded.artifact.value_id == fit.artifact.value_id
+    assert loaded.artifact.value_id == original.artifact.value_id
+    assert loaded.artifact.id == original.artifact.id
 
 
-def test_different_models_result_in_different_value_ids(dbdiskrepo):
-    torch.manual_seed(0)
-    data = random_data()
-    model1 = basic_model()
-    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
+def test_different_seeds_result_in_different_models(dbdiskrepo):
+    fit1 = fit_model(seed=0)
+    fit2 = fit_model(seed=1)
 
-    torch.manual_seed(1)
-    model2 = basic_model()
-    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
-
+    assert p.hash(fit1) != p.hash(fit2)
     assert fit1.artifact.id != fit2.artifact.id
     assert fit1.artifact.value_id != fit2.artifact.value_id
 
 
 def test_same_seeds_result_in_same_models(dbdiskrepo):
-    data = random_data()
+    fit1 = fit_model(seed=0)
+    fit2 = fit_model(seed=0)
 
-    torch.manual_seed(0)
-    model1 = basic_model()
-    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
-
-    torch.manual_seed(0)
-    model2 = basic_model()
-    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
-
-    assert model1.artifact.id == model2.artifact.id
-    assert model1.artifact.value_id == model2.artifact.value_id
-    # This fails
+    assert p.hash(fit1) == p.hash(fit2)
     assert fit1.artifact.id == fit2.artifact.id
     assert fit1.artifact.value_id == fit2.artifact.value_id
