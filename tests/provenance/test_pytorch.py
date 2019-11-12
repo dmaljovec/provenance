@@ -148,8 +148,9 @@ def test_different_models_result_in_different_value_ids(dbdiskrepo):
 
 
 def test_same_seeds_result_in_same_models(dbdiskrepo):
-    torch.manual_seed(0)
     data = random_data()
+
+    torch.manual_seed(0)
     model1 = basic_model()
     fit1 = fit_model(model1, data['X_train'], data['Y_train'])
 
