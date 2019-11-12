@@ -157,5 +157,8 @@ def test_same_seeds_result_in_same_models(dbdiskrepo):
     model2 = basic_model()
     fit2 = fit_model(model2, data['X_train'], data['Y_train'])
 
+    assert model1.artifact.id == model2.artifact.id
+    assert model1.artifact.value_id == model2.artifact.value_id
     # This fails
-    # assert fit1.artifact.value_id == fit2.artifact.value_id
+    assert fit1.artifact.id == fit2.artifact.id
+    assert fit1.artifact.value_id == fit2.artifact.value_id
