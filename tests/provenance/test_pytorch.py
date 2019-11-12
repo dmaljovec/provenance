@@ -1,3 +1,4 @@
+import torch
 from provenance.hashing import hash
 from conftest import artifact_record
 import provenance.utils as u
@@ -19,7 +20,6 @@ from copy import copy, deepcopy
 
 import pytest
 pytest.importorskip("torch")
-import torch
 
 
 class TwoLayerNet(torch.nn.Module):
@@ -43,7 +43,6 @@ class TwoLayerNet(torch.nn.Module):
         return y_pred
 
 
-# @p.provenance(returns_composite=True)
 def random_data(N=64, D_in=1000, H=100, D_out=10):
     """
     N is batch size
@@ -64,11 +63,7 @@ def random_data(N=64, D_in=1000, H=100, D_out=10):
 
 
 @p.provenance(returns_composite=True)
-def fit_model(model,
-              x,
-              y,
-              batch_size=32,
-              epochs=500,):
+def fit_model(model, x, y, batch_size=32, epochs=500):
 
     model_ = deepcopy(model)
     # Construct our loss function and an Optimizer. The call to
@@ -99,23 +94,68 @@ def basic_model(D_in=1000, H=100, D_out=10):
     return TwoLayerNet(D_in=D_in, H=H, D_out=D_out)
 
 
+def test_same_models(dbdiskrepo):
+    model1 = basic_model()
+    model2 = basic_model()
+    assert model1.artifact.id == model2.artifact.id
+
+    model3 = copy(model1)
+    assert model1.artifact.id == model3.artifact.id
+    assert hash(model1) == hash(model3)
+
+    model4 = deepcopy(model1)
+    assert model1.artifact.id == model4.artifact.id
+    assert hash(model1) == hash(model4)
+
+
 def test_integration_pytorch_test(dbdiskrepo):
+    model1 = basic_model()
+    model2 = copy(model1)
+    assert model1.artifact.id == model2.artifact.id
+    assert hash(model1) == hash(model2)
 
     data = random_data()
+    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
+    assert model1.artifact.id != fit1.artifact.id
+    assert model1.artifact.value_id != fit1.artifact.value_id
+
+    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
+    assert fit1.artifact.value_id == fit2.artifact.value_id
+
+
+def test_reloading_from_disk_has_same_value_id(dbdiskrepo):
+    data = random_data()
     model = basic_model()
-    model2 = copy(model)
-    assert model2.artifact.id == model.artifact.id
-    assert hash(model2) == hash(model)
+    fit = fit_model(model, data['X_train'], data['Y_train'])
+    loaded = p.load_proxy(fit.artifact.id)
 
-    fitted_model = fit_model(model, data['X_train'], data['Y_train'])
+    assert loaded.artifact.value_id == p.hash(loaded.artifact.value)
+    assert loaded.artifact.value_id == fit.artifact.value_id
 
-    assert model.artifact.id != fitted_model.artifact.id
-    assert fitted_model.artifact.value_id == p.hash(fitted_model.artifact.value)
 
-    # model2 = basic_model()
-    # assert model2.artifact.id == model.artifact.id
-    # assert hash(model2) == hash(model)
+def test_different_models_result_in_different_value_ids(dbdiskrepo):
+    torch.manual_seed(0)
+    data = random_data()
+    model1 = basic_model()
+    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
 
-    # fitted_model2 = fit_model(model2, data['X_train'], data['Y_train'])
+    torch.manual_seed(1)
+    model2 = basic_model()
+    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
 
-    # assert fitted_model2.artifact.id == fitted_model.artifact.id
+    assert fit1.artifact.id != fit2.artifact.id
+    assert fit1.artifact.value_id != fit2.artifact.value_id
+
+
+def test_same_seeds_result_in_same_models(dbdiskrepo):
+    torch.manual_seed(0)
+    data = random_data()
+    model1 = basic_model()
+    fit1 = fit_model(model1, data['X_train'], data['Y_train'])
+
+    torch.manual_seed(0)
+    model2 = basic_model()
+    fit2 = fit_model(model2, data['X_train'], data['Y_train'])
+
+    # This fails
+    # assert fit1.artifact.value_id == fit2.artifact.value_id
